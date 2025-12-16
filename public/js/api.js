@@ -57,13 +57,22 @@ async function loadBandeauData() {
  * @param {number} speed - Vitesse de défilement en secondes
  * @param {string} color - Couleur principale du texte
  * @param {string} accessCode - Code d'accès pour l'authentification
- * @returns {Promise<boolean>}
+ * @returns {Promise<{success: boolean, message: string, error?: string}>}
  */
 async function saveBandeauData(html, speed, color, accessCode) {
   // Sauvegarde locale immédiate (backup)
   localStorage.setItem(STORAGE_KEY_TEXT, html);
   localStorage.setItem(STORAGE_KEY_SPEED, String(speed));
   localStorage.setItem(STORAGE_KEY_COLOR, color);
+  
+  // Si pas de code d'accès, on sauvegarde seulement en local
+  if (!accessCode) {
+    return {
+      success: false,
+      message: 'Sauvegarde locale uniquement (code d\'accès requis pour la base de données)',
+      localOnly: true
+    };
+  }
   
   try {
     const response = await fetch('/api/update-bandeau', {
@@ -75,21 +84,53 @@ async function saveBandeauData(html, speed, color, accessCode) {
         html,
         speed,
         color,
-        accessCode: accessCode || ''
+        accessCode: accessCode
       })
     });
     
+    const responseData = await response.json().catch(() => ({}));
+    
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      let errorMessage = 'Erreur lors de la sauvegarde';
+      
+      if (response.status === 403) {
+        errorMessage = 'Code d\'accès incorrect';
+      } else if (response.status === 400) {
+        errorMessage = responseData.details?.[0] || responseData.error || 'Données invalides';
+      } else if (response.status === 503) {
+        errorMessage = 'Base de données non disponible. Vérifiez la configuration KV.';
+      } else {
+        errorMessage = responseData.error || `Erreur HTTP ${response.status}`;
+      }
+      
+      return {
+        success: false,
+        message: errorMessage,
+        error: responseData.error,
+        status: response.status
+      };
     }
     
-    const result = await response.json();
-    return result.success === true;
+    if (responseData.success) {
+      return {
+        success: true,
+        message: 'Modifications sauvegardées avec succès dans la base de données'
+      };
+    } else {
+      return {
+        success: false,
+        message: 'La sauvegarde a échoué',
+        error: responseData.error
+      };
+    }
   } catch (error) {
     console.error('Erreur lors de la sauvegarde via l\'API:', error);
-    // Les données sont déjà sauvegardées dans localStorage
-    return false;
+    return {
+      success: false,
+      message: 'Erreur de connexion. Les données sont sauvegardées localement uniquement.',
+      error: error.message,
+      localOnly: true
+    };
   }
 }
 

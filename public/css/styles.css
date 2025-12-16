@@ -223,3 +223,72 @@ body {
 /* Classe de masquage de l'éditeur (pour la logique JS) */
 .editor-hidden { display: none !important; }
 
+/* Notifications de sauvegarde */
+.notification {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    padding: 14px 20px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    z-index: 10000;
+    font-size: 0.9rem;
+    font-weight: 500;
+    min-width: 250px;
+    max-width: 400px;
+    animation: slideInRight 0.3s ease-out;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.notification-success {
+    background-color: #10b981;
+    color: white;
+    border-left: 4px solid #059669;
+}
+
+.notification-error {
+    background-color: #ef4444;
+    color: white;
+    border-left: 4px solid #dc2626;
+}
+
+.notification-warning {
+    background-color: #f59e0b;
+    color: white;
+    border-left: 4px solid #d97706;
+}
+
+.notification-info {
+    background-color: var(--accent);
+    color: #000;
+    border-left: 4px solid #0099cc;
+}
+
+@keyframes slideInRight {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+@keyframes slideOutRight {
+    from {
+        transform: translateX(0);
+        opacity: 1;
+    }
+    to {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+}
+
+.notification.hiding {
+    animation: slideOutRight 0.3s ease-in forwards;
+}
+

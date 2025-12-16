@@ -22,6 +22,48 @@ const root = document.documentElement;
 let currentAccessCode = null;
 
 /**
+ * Affiche une notification à l'utilisateur
+ * @param {string} message - Message à afficher
+ * @param {string} type - Type de notification: 'success', 'error', 'warning', 'info'
+ * @param {number} duration - Durée d'affichage en millisecondes (défaut: 4000)
+ */
+function showNotification(message, type = 'info', duration = 4000) {
+  // Supprimer les notifications existantes
+  const existingNotifications = document.querySelectorAll('.notification');
+  existingNotifications.forEach(notif => {
+    notif.classList.add('hiding');
+    setTimeout(() => notif.remove(), 300);
+  });
+
+  // Créer la notification
+  const notification = document.createElement('div');
+  notification.className = `notification notification-${type}`;
+  
+  // Icône selon le type
+  const icons = {
+    success: '✓',
+    error: '✗',
+    warning: '⚠',
+    info: 'ℹ'
+  };
+  
+  notification.innerHTML = `
+    <span style="font-size: 1.2em; font-weight: bold;">${icons[type] || icons.info}</span>
+    <span>${message}</span>
+  `;
+  
+  document.body.appendChild(notification);
+  
+  // Supprimer automatiquement après la durée spécifiée
+  setTimeout(() => {
+    notification.classList.add('hiding');
+    setTimeout(() => notification.remove(), 300);
+  }, duration);
+  
+  return notification;
+}
+
+/**
  * Applique une classe CSS à la sélection (Utilisée pour toutes les couleurs, y compris Blanc)
  */
 function applyColorClassToSelection(className) {
@@ -220,10 +262,20 @@ document.addEventListener('DOMContentLoaded', async ()=>{
       updateScrollFromHtml(html); 
       setScrollColor(color); 
       
+      // Afficher un message de chargement
+      showNotification('Sauvegarde en cours...', 'info', 2000);
+      
       // Sauvegarde via API avec le code d'accès
-      const success = await saveBandeauData(html, speed, color, currentAccessCode);
-      if (!success && currentAccessCode) {
-        alert('Erreur lors de la sauvegarde. Vérifiez votre code d\'accès.');
+      const result = await saveBandeauData(html, speed, color, currentAccessCode);
+      
+      if (result.success) {
+        showNotification(result.message, 'success', 5000);
+      } else {
+        if (result.localOnly) {
+          showNotification(result.message, 'warning', 6000);
+        } else {
+          showNotification(result.message, 'error', 6000);
+        }
       }
   });
   
@@ -242,10 +294,20 @@ document.addEventListener('DOMContentLoaded', async ()=>{
       setScrollDuration(initialSpeed); 
       setScrollColor(initialColor);
       
+      // Afficher un message de chargement
+      showNotification('Réinitialisation en cours...', 'info', 2000);
+      
       // Sauvegarde via API avec le code d'accès
-      const success = await saveBandeauData(initialHtml, initialSpeed, initialColor, currentAccessCode);
-      if (!success && currentAccessCode) {
-        alert('Erreur lors de la réinitialisation. Vérifiez votre code d\'accès.');
+      const result = await saveBandeauData(initialHtml, initialSpeed, initialColor, currentAccessCode);
+      
+      if (result.success) {
+        showNotification('Réinitialisation sauvegardée avec succès dans la base de données', 'success', 5000);
+      } else {
+        if (result.localOnly) {
+          showNotification(result.message, 'warning', 6000);
+        } else {
+          showNotification(result.message, 'error', 6000);
+        }
       }
   });
 
@@ -260,29 +322,49 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   whiteBtn.addEventListener('click', (e) => { e.preventDefault(); applyColorClassToSelection('status-white'); }); 
 
   // GESTION DE LA VITESSE
+  let speedSaveTimeout = null;
   document.getElementById('speed').addEventListener('input', async (e)=>{ 
       const val = parseInt(e.target.value, 10); 
       document.getElementById('speedValue').textContent = val; 
       setScrollDuration(val); 
       
       // Sauvegarde automatique de la vitesse (seulement si l'éditeur est ouvert)
+      // Debounce pour éviter trop de requêtes
       if (currentAccessCode) {
-        const html = editor.innerHTML;
-        const color = colorInput.value;
-        await saveBandeauData(html, val, color, currentAccessCode);
+        clearTimeout(speedSaveTimeout);
+        speedSaveTimeout = setTimeout(async () => {
+          const html = editor.innerHTML;
+          const color = colorInput.value;
+          const result = await saveBandeauData(html, val, color, currentAccessCode);
+          if (result.success) {
+            showNotification('Vitesse sauvegardée', 'success', 3000);
+          } else if (!result.localOnly) {
+            showNotification('Erreur lors de la sauvegarde de la vitesse', 'error', 4000);
+          }
+        }, 1000); // Attendre 1 seconde après le dernier changement
       }
   });
 
   // GESTION DE LA COULEUR PRINCIPALE
+  let colorSaveTimeout = null;
   colorInput.addEventListener('input', async (e)=>{ 
       const val = e.target.value; 
       setScrollColor(val); 
       
       // Sauvegarde automatique de la couleur (seulement si l'éditeur est ouvert)
+      // Debounce pour éviter trop de requêtes
       if (currentAccessCode) {
-        const html = editor.innerHTML;
-        const speed = parseInt(document.getElementById('speed').value, 10);
-        await saveBandeauData(html, speed, val, currentAccessCode);
+        clearTimeout(colorSaveTimeout);
+        colorSaveTimeout = setTimeout(async () => {
+          const html = editor.innerHTML;
+          const speed = parseInt(document.getElementById('speed').value, 10);
+          const result = await saveBandeauData(html, speed, val, currentAccessCode);
+          if (result.success) {
+            showNotification('Couleur sauvegardée', 'success', 3000);
+          } else if (!result.localOnly) {
+            showNotification('Erreur lors de la sauvegarde de la couleur', 'error', 4000);
+          }
+        }, 1000); // Attendre 1 seconde après le dernier changement
       }
   });
 
@@ -296,10 +378,21 @@ document.addEventListener('DOMContentLoaded', async ()=>{
           updateScrollFromHtml(html); 
           setScrollColor(color);
           
-          const success = await saveBandeauData(html, speed, color, currentAccessCode);
-          if (!success && currentAccessCode) {
-            alert('Erreur lors de la sauvegarde. Vérifiez votre code d\'accès.');
+          // Afficher un message de chargement
+          showNotification('Sauvegarde en cours...', 'info', 2000);
+          
+          const result = await saveBandeauData(html, speed, color, currentAccessCode);
+          
+          if (result.success) {
+            showNotification(result.message, 'success', 5000);
+          } else {
+            if (result.localOnly) {
+              showNotification(result.message, 'warning', 6000);
+            } else {
+              showNotification(result.message, 'error', 6000);
+            }
           }
+          
           editor.blur(); 
       } 
   });

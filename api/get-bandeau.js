@@ -5,6 +5,15 @@
 
 import { kv } from '@vercel/kv';
 
+// Initialisation explicite du client KV pour Edge Runtime
+// Les variables d'environnement sont automatiquement injectées par Vercel
+let kvClient = kv;
+
+// Vérification de la configuration KV au chargement
+if (!process.env.KV_REST_API_URL || !process.env.KV_REST_API_TOKEN) {
+  console.warn('⚠️ Variables d\'environnement KV non configurées');
+}
+
 const CHECKMARK_BLUE_SVG_HTML = '<svg class="blue-check-svg" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>';
 const DEFAULT_COLOR = '#FFFFFF';
 
@@ -38,8 +47,13 @@ export default async function handler(req) {
   }
 
   try {
+    // Vérifier que KV est configuré
+    if (!process.env.KV_REST_API_URL || !process.env.KV_REST_API_TOKEN) {
+      throw new Error('KV non configuré : variables d\'environnement manquantes');
+    }
+
     // Récupération des données depuis Vercel KV
-    const data = await kv.get('bandeau:data');
+    const data = await kvClient.get('bandeau:data');
 
     // Si aucune donnée n'existe, retourner les valeurs par défaut
     if (!data) {
@@ -79,14 +93,20 @@ export default async function handler(req) {
     );
   } catch (error) {
     console.error('Error fetching bandeau data:', error);
+    console.error('Error details:', {
+      message: error.message,
+      kv_configured: !!(process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN),
+    });
     
-    // En cas d'erreur, retourner les valeurs par défaut
+    // En cas d'erreur, retourner les valeurs par défaut avec détails de l'erreur
     return new Response(
       JSON.stringify({
         html: defaultMessagesHTML,
         speed: 5,
         color: DEFAULT_COLOR,
         error: 'Failed to load data, using defaults',
+        error_details: process.env.NODE_ENV === 'development' ? error.message : undefined,
+        kv_configured: !!(process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN),
       }),
       {
         status: 200, // 200 pour permettre le fonctionnement même en cas d'erreur

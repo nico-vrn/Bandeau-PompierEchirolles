@@ -5,6 +5,14 @@
 
 import { kv } from '@vercel/kv';
 
+// Initialisation explicite du client KV pour Edge Runtime
+let kvClient = kv;
+
+// Vérification de la configuration KV au chargement
+if (!process.env.KV_REST_API_URL || !process.env.KV_REST_API_TOKEN) {
+  console.warn('⚠️ Variables d\'environnement KV non configurées');
+}
+
 export const config = {
   runtime: 'edge',
 };
@@ -139,6 +147,25 @@ export default async function handler(req) {
       );
     }
 
+    // Vérifier que KV est configuré
+    if (!process.env.KV_REST_API_URL || !process.env.KV_REST_API_TOKEN) {
+      return new Response(
+        JSON.stringify({ 
+          error: 'KV non configuré',
+          details: 'Les variables d\'environnement KV_REST_API_URL et KV_REST_API_TOKEN doivent être configurées'
+        }),
+        {
+          status: 503,
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Content-Type-Options': 'nosniff',
+            'X-Frame-Options': 'DENY',
+            'X-XSS-Protection': '1; mode=block',
+          },
+        }
+      );
+    }
+
     // Préparer les données à sauvegarder
     const dataToSave = {
       html: sanitizedHTML,
@@ -148,7 +175,7 @@ export default async function handler(req) {
     };
 
     // Sauvegarder dans Vercel KV
-    await kv.set('bandeau:data', dataToSave);
+    await kvClient.set('bandeau:data', dataToSave);
 
     return new Response(
       JSON.stringify({ 
@@ -167,6 +194,11 @@ export default async function handler(req) {
     );
   } catch (error) {
     console.error('Error updating bandeau data:', error);
+    console.error('Error details:', {
+      message: error.message,
+      kv_configured: !!(process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN),
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
+    });
 
     // Gestion des erreurs de parsing JSON
     if (error instanceof SyntaxError || error.message?.includes('JSON')) {

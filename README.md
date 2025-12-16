@@ -51,7 +51,22 @@ Bandeau-PompierEchirolles/
    npm install
    ```
 
-3. **Configurer les variables d'environnement**
+3. **Installer Vercel CLI** (si ce n'est pas déjà fait)
+   ```bash
+   npm install -g vercel
+   ```
+
+4. **Se connecter à Vercel**
+   ```bash
+   vercel login
+   ```
+
+5. **Lier le projet à Vercel** (si pas déjà fait)
+   ```bash
+   vercel link
+   ```
+
+6. **Configurer les variables d'environnement locales**
 
    Créez un fichier `.env.local` à la racine du projet :
    ```env
@@ -59,13 +74,26 @@ Bandeau-PompierEchirolles/
    KV_REST_API_URL=https://your-kv-instance.upstash.io
    KV_REST_API_TOKEN=your_kv_token_here
    ```
+   
+   **Ou utilisez** `vercel env pull .env.local` pour récupérer automatiquement les variables depuis Vercel.
 
-4. **Lancer le serveur de développement**
+7. **Lancer le serveur de développement**
    ```bash
    npm run dev
    ```
+   
+   Ou directement :
+   ```bash
+   vercel dev
+   ```
 
    L'application sera accessible sur `http://localhost:3000`
+
+8. **Tester la connexion KV en local**
+   
+   Ouvrez dans votre navigateur : `http://localhost:3000/api/health-kv`
+   
+   Vous devriez voir un JSON avec le statut de la connexion. Si `kv_connected: false`, vérifiez vos variables d'environnement dans `.env.local`.
 
 ## 🌐 Déploiement sur Vercel
 
@@ -75,9 +103,11 @@ Bandeau-PompierEchirolles/
 2. Allez dans **Storage** > **Create Database**
 3. Sélectionnez **KV** (Redis)
 4. Créez une nouvelle base de données KV
-5. Notez les credentials générés :
-   - `KV_REST_API_URL`
-   - `KV_REST_API_TOKEN`
+5. **Important** : Une fois créée, allez dans les **Settings** de la base KV
+6. **Liez la base au projet** : Dans l'onglet "Linked Projects", ajoutez votre projet
+7. Notez les credentials générés (disponibles dans l'onglet "Settings" > "REST API") :
+   - `KV_REST_API_URL` : URL complète de l'API REST
+   - `KV_REST_API_TOKEN` : Token d'authentification (gardez-le secret !)
 
 ### 2. Configurer les variables d'environnement
 
@@ -107,7 +137,37 @@ vercel
 3. Importez votre dépôt GitHub
 4. Vercel détectera automatiquement la configuration et déploiera
 
-### 4. Vérifier le déploiement
+### 4. Vérifier la connexion KV
+
+Après avoir configuré les variables d'environnement, testez la connexion à Vercel KV :
+
+1. Accédez à : `https://votre-projet.vercel.app/api/health-kv`
+2. Vous devriez voir un JSON avec le statut de la connexion :
+   ```json
+   {
+     "timestamp": "2024-01-01T00:00:00.000Z",
+     "kv_configured": true,
+     "kv_connected": true,
+     "env_vars": {
+       "KV_REST_API_URL": "https://...",
+       "KV_REST_API_TOKEN": "...",
+       "has_url": true,
+       "has_token": true
+     },
+     "test_result": {
+       "write": "OK",
+       "read": "OK",
+       "main_key_exists": false
+     }
+   }
+   ```
+
+**Si vous voyez `kv_configured: false` ou `kv_connected: false`** :
+- Vérifiez que les variables d'environnement sont bien configurées dans Vercel Dashboard
+- Assurez-vous que la base KV est bien créée et liée au projet
+- Redéployez l'application après avoir ajouté les variables
+
+### 5. Vérifier le déploiement
 
 Une fois déployé, votre application sera accessible à l'URL fournie par Vercel (ex: `https://votre-projet.vercel.app`)
 
@@ -171,8 +231,16 @@ Les couleurs sont définies dans `public/css/styles.css` via les variables CSS :
 
 ### Les données ne se sauvegardent pas
 
-- Vérifiez que les variables d'environnement KV sont correctement configurées dans Vercel
-- Vérifiez les logs dans Vercel Dashboard > Deployments > [votre déploiement] > Functions
+1. **Testez la connexion KV** : Accédez à `/api/health-kv` pour voir l'état de la connexion
+2. **Vérifiez les variables d'environnement** :
+   - Allez dans Vercel Dashboard > Settings > Environment Variables
+   - Assurez-vous que `KV_REST_API_URL` et `KV_REST_API_TOKEN` sont présentes
+   - Vérifiez qu'elles sont appliquées à tous les environnements (Production, Preview, Development)
+3. **Vérifiez que la base KV est liée au projet** :
+   - Vercel Dashboard > Storage > [votre base KV] > Settings
+   - Vérifiez que le projet est bien lié
+4. **Vérifiez les logs** : Vercel Dashboard > Deployments > [votre déploiement] > Functions > Logs
+5. **Redéployez** après avoir modifié les variables d'environnement
 
 ### Erreur "Code d'accès incorrect"
 
