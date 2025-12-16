@@ -104,7 +104,7 @@ Bandeau-PompierEchirolles/
 
 ### 1. Créer un Edge Config Store
 
-**✅ Créez un Edge Config Store (c'est le bon choix maintenant !)**
+**✅ Créez un Edge Config Store**
 
 1. Connectez-vous au [Dashboard Vercel](https://vercel.com/dashboard)
 2. Allez dans **Storage** > **Create Database**
@@ -126,7 +126,7 @@ Dans le Dashboard Vercel :
 
    | Variable | Valeur | Description |
    |----------|--------|-------------|
-   | `ACCESS_CODE` | `7702` (ou votre code) | Code d'accès pour l'édition |
+   | `ACCESS_CODE` | `CODE` (ou votre code) | Code d'accès pour l'édition |
    | `EDGE_CONFIG` | Connection string | Connection string Edge Config (ex: `https://edge-config.vercel.com/ecfg_xxx`) |
    | `VERCEL_TOKEN` | Token Vercel | Token Vercel pour l'écriture (optionnel en production) |
    
@@ -283,6 +283,3 @@ Les couleurs sont définies dans `public/css/styles.css` via les variables CSS :
 
 Voir le fichier [LICENSE](LICENSE) pour plus d'informations.
 
-## 🤝 Contribution
-
-Les contributions sont les bienvenues ! N'hésitez pas à ouvrir une issue ou une pull request.
