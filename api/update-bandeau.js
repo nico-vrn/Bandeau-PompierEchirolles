@@ -249,8 +249,8 @@ export default async function handler(req) {
     };
 
     // Sauvegarder dans Edge Config via API REST
-    // Edge Config stocke des valeurs simples, on stringifie le JSON
-    await updateEdgeConfig('bandeau_data', JSON.stringify(dataToSave));
+    // Edge Config accepte directement les objets JSON
+    await updateEdgeConfig('bandeau_data', dataToSave);
 
     return new Response(
       JSON.stringify({ 

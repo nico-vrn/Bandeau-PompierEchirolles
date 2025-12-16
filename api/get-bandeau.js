@@ -52,11 +52,11 @@ export default async function handler(req) {
     }
 
     // Récupération des données depuis Edge Config
-    // Edge Config stocke des valeurs simples, on récupère le JSON stringifié
-    const dataJson = await get('bandeau_data');
+    // Edge Config retourne directement l'objet JSON
+    const data = await get('bandeau_data');
 
     // Si aucune donnée n'existe, retourner les valeurs par défaut
-    if (!dataJson) {
+    if (!data) {
       return new Response(
         JSON.stringify({
           html: defaultMessagesHTML,
@@ -65,25 +65,18 @@ export default async function handler(req) {
         }),
         {
           status: 200,
-          headers: {
-            'Content-Type': 'application/json',
-            'Cache-Control': 'public, max-age=60', // Cache de 60 secondes
-            'X-Content-Type-Options': 'nosniff',
-            'X-Frame-Options': 'DENY',
-            'X-XSS-Protection': '1; mode=block',
-          },
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache, no-store, must-revalidate', // Pas de cache
+          'X-Content-Type-Options': 'nosniff',
+          'X-Frame-Options': 'DENY',
+          'X-XSS-Protection': '1; mode=block',
+        },
         }
       );
     }
 
-    // Parser le JSON stocké
-    let data;
-    if (typeof dataJson === 'string') {
-      data = JSON.parse(dataJson);
-    } else {
-      data = dataJson; // Si déjà un objet
-    }
-
+    // Edge Config retourne déjà un objet, pas besoin de parser
     // Retourner les données stockées
     return new Response(
       JSON.stringify({
@@ -95,7 +88,7 @@ export default async function handler(req) {
         status: 200,
         headers: {
           'Content-Type': 'application/json',
-          'Cache-Control': 'public, max-age=60',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
           'X-Content-Type-Options': 'nosniff',
           'X-Frame-Options': 'DENY',
           'X-XSS-Protection': '1; mode=block',
@@ -121,12 +114,13 @@ export default async function handler(req) {
       }),
       {
         status: 200, // 200 pour permettre le fonctionnement même en cas d'erreur
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Content-Type-Options': 'nosniff',
-          'X-Frame-Options': 'DENY',
-          'X-XSS-Protection': '1; mode=block',
-        },
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'X-Content-Type-Options': 'nosniff',
+        'X-Frame-Options': 'DENY',
+        'X-XSS-Protection': '1; mode=block',
+      },
       }
     );
   }
