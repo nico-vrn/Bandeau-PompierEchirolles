@@ -1,17 +1,13 @@
 /**
- * API Route GET - Récupère les données du bandeau depuis Vercel KV Edge
+ * API Route GET - Récupère les données du bandeau depuis Edge Config
  * Retourne les valeurs par défaut si aucune donnée n'existe
  */
 
-import { kv } from '@vercel/kv';
+import { get } from '@vercel/edge-config';
 
-// Initialisation explicite du client KV pour Edge Runtime
-// Les variables d'environnement sont automatiquement injectées par Vercel
-let kvClient = kv;
-
-// Vérification de la configuration KV au chargement
-if (!process.env.KV_REST_API_URL || !process.env.KV_REST_API_TOKEN) {
-  console.warn('⚠️ Variables d\'environnement KV non configurées');
+// Vérification de la configuration Edge Config au chargement
+if (!process.env.EDGE_CONFIG) {
+  console.warn('⚠️ Variable d\'environnement EDGE_CONFIG non configurée');
 }
 
 const CHECKMARK_BLUE_SVG_HTML = '<svg class="blue-check-svg" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>';
@@ -41,22 +37,26 @@ export default async function handler(req) {
         headers: {
           'Content-Type': 'application/json',
           'Allow': 'GET',
+          'X-Content-Type-Options': 'nosniff',
+          'X-Frame-Options': 'DENY',
+          'X-XSS-Protection': '1; mode=block',
         },
       }
     );
   }
 
   try {
-    // Vérifier que KV est configuré
-    if (!process.env.KV_REST_API_URL || !process.env.KV_REST_API_TOKEN) {
-      throw new Error('KV non configuré : variables d\'environnement manquantes');
+    // Vérifier que Edge Config est configuré
+    if (!process.env.EDGE_CONFIG) {
+      throw new Error('Edge Config non configuré : variable d\'environnement EDGE_CONFIG manquante');
     }
 
-    // Récupération des données depuis Vercel KV
-    const data = await kvClient.get('bandeau:data');
+    // Récupération des données depuis Edge Config
+    // Edge Config stocke des valeurs simples, on récupère le JSON stringifié
+    const dataJson = await get('bandeau_data');
 
     // Si aucune donnée n'existe, retourner les valeurs par défaut
-    if (!data) {
+    if (!dataJson) {
       return new Response(
         JSON.stringify({
           html: defaultMessagesHTML,
@@ -65,15 +65,23 @@ export default async function handler(req) {
         }),
         {
           status: 200,
-        headers: {
-          'Content-Type': 'application/json',
-          'Cache-Control': 'public, max-age=60', // Cache de 60 secondes
-          'X-Content-Type-Options': 'nosniff',
-          'X-Frame-Options': 'DENY',
-          'X-XSS-Protection': '1; mode=block',
-        },
+          headers: {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'public, max-age=60', // Cache de 60 secondes
+            'X-Content-Type-Options': 'nosniff',
+            'X-Frame-Options': 'DENY',
+            'X-XSS-Protection': '1; mode=block',
+          },
         }
       );
+    }
+
+    // Parser le JSON stocké
+    let data;
+    if (typeof dataJson === 'string') {
+      data = JSON.parse(dataJson);
+    } else {
+      data = dataJson; // Si déjà un objet
     }
 
     // Retourner les données stockées
@@ -88,6 +96,9 @@ export default async function handler(req) {
         headers: {
           'Content-Type': 'application/json',
           'Cache-Control': 'public, max-age=60',
+          'X-Content-Type-Options': 'nosniff',
+          'X-Frame-Options': 'DENY',
+          'X-XSS-Protection': '1; mode=block',
         },
       }
     );
@@ -95,7 +106,7 @@ export default async function handler(req) {
     console.error('Error fetching bandeau data:', error);
     console.error('Error details:', {
       message: error.message,
-      kv_configured: !!(process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN),
+      edge_config_configured: !!process.env.EDGE_CONFIG,
     });
     
     // En cas d'erreur, retourner les valeurs par défaut avec détails de l'erreur
@@ -106,7 +117,7 @@ export default async function handler(req) {
         color: DEFAULT_COLOR,
         error: 'Failed to load data, using defaults',
         error_details: process.env.NODE_ENV === 'development' ? error.message : undefined,
-        kv_configured: !!(process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN),
+        edge_config_configured: !!process.env.EDGE_CONFIG,
       }),
       {
         status: 200, // 200 pour permettre le fonctionnement même en cas d'erreur
@@ -120,4 +131,3 @@ export default async function handler(req) {
     );
   }
 }
-

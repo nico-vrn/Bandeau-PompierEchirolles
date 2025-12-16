@@ -1,6 +1,6 @@
 # Bandeau Défilant - Pompiers d'Échirolles
 
-Application web pour afficher un bandeau d'information défilant (5cm de hauteur) avec édition en ligne et stockage cloud via Vercel KV.
+Application web pour afficher un bandeau d'information défilant (5cm de hauteur) avec édition en ligne et stockage cloud via Edge Config.
 
 ## 🚀 Fonctionnalités
 
@@ -8,7 +8,7 @@ Application web pour afficher un bandeau d'information défilant (5cm de hauteur
 - **Édition en ligne** : Interface d'édition protégée par code d'accès
 - **Coloration sélective** : Application de couleurs (Rouge, Jaune, Bleu, Blanc) sur des mots sélectionnés
 - **Mode plein écran** : Affichage dédié pour diffusion sur écran
-- **Stockage cloud** : Données synchronisées via Vercel KV Edge
+- **Stockage cloud** : Données synchronisées via Edge Config (latence ultra-faible)
 - **Sécurisé** : Authentification, validation et sanitization des données
 
 ## 📁 Structure du projet
@@ -71,9 +71,14 @@ Bandeau-PompierEchirolles/
    Créez un fichier `.env.local` à la racine du projet :
    ```env
    ACCESS_CODE=CODE
-   KV_REST_API_URL=https://your-kv-instance.upstash.io
-   KV_REST_API_TOKEN=your_kv_token_here
+   EDGE_CONFIG=https://edge-config.vercel.com/ecfg_xxx
+   VERCEL_TOKEN=your_vercel_token_here
    ```
+   
+   **Variables d'environnement** :
+   - `ACCESS_CODE` : Code d'accès pour modifier le bandeau
+   - `EDGE_CONFIG` : Connection string Edge Config (format : `https://edge-config.vercel.com/ecfg_xxx` ou juste `ecfg_xxx`)
+   - `VERCEL_TOKEN` : Token Vercel pour l'écriture (optionnel en production, Vercel l'injecte automatiquement)
    
    **Ou utilisez** `vercel env pull .env.local` pour récupérer automatiquement les variables depuis Vercel.
 
@@ -89,25 +94,28 @@ Bandeau-PompierEchirolles/
 
    L'application sera accessible sur `http://localhost:3000`
 
-8. **Tester la connexion KV en local**
+8. **Tester la connexion Edge Config en local**
    
-   Ouvrez dans votre navigateur : `http://localhost:3000/api/health-kv`
+   Ouvrez dans votre navigateur : `http://localhost:3000/api/health-edge-config`
    
-   Vous devriez voir un JSON avec le statut de la connexion. Si `kv_connected: false`, vérifiez vos variables d'environnement dans `.env.local`.
+   Vous devriez voir un JSON avec le statut de la connexion. Si `edge_config_connected: false`, vérifiez vos variables d'environnement dans `.env.local`.
 
 ## 🌐 Déploiement sur Vercel
 
-### 1. Créer un projet Vercel KV
+### 1. Créer un Edge Config Store
+
+**✅ Créez un Edge Config Store (c'est le bon choix maintenant !)**
 
 1. Connectez-vous au [Dashboard Vercel](https://vercel.com/dashboard)
 2. Allez dans **Storage** > **Create Database**
-3. Sélectionnez **KV** (Redis)
-4. Créez une nouvelle base de données KV
-5. **Important** : Une fois créée, allez dans les **Settings** de la base KV
-6. **Liez la base au projet** : Dans l'onglet "Linked Projects", ajoutez votre projet
-7. Notez les credentials générés (disponibles dans l'onglet "Settings" > "REST API") :
-   - `KV_REST_API_URL` : URL complète de l'API REST
-   - `KV_REST_API_TOKEN` : Token d'authentification (gardez-le secret !)
+3. **Sélectionnez "Edge Config"** (avec l'icône violette `{}`)
+4. Créez un nouveau Edge Config Store avec un nom (ex: "bandeau-config")
+5. **Important** : Une fois créé, allez dans les **Settings** de l'Edge Config Store
+6. **Liez le store au projet** : Dans l'onglet "Linked Projects", ajoutez votre projet
+7. **Récupérez la connection string** : Dans l'onglet "Settings", vous verrez :
+   - **Connection String** → C'est votre `EDGE_CONFIG` (format : `https://edge-config.vercel.com/ecfg_xxx` ou juste `ecfg_xxx`)
+   
+   **Note** : Edge Config est parfait pour ce cas d'usage car il offre une latence ultra-faible et une configuration simple (une seule variable d'environnement).
 
 ### 2. Configurer les variables d'environnement
 
@@ -118,9 +126,11 @@ Dans le Dashboard Vercel :
 
    | Variable | Valeur | Description |
    |----------|--------|-------------|
-   | `ACCESS_CODE` | `CODE` (ou votre code) | Code d'accès pour l'édition |
-   | `KV_REST_API_URL` | URL de votre KV | URL de l'API Vercel KV |
-   | `KV_REST_API_TOKEN` | Token généré | Token d'authentification KV |
+   | `ACCESS_CODE` | `7702` (ou votre code) | Code d'accès pour l'édition |
+   | `EDGE_CONFIG` | Connection string | Connection string Edge Config (ex: `https://edge-config.vercel.com/ecfg_xxx`) |
+   | `VERCEL_TOKEN` | Token Vercel | Token Vercel pour l'écriture (optionnel en production) |
+   
+   **Note** : En production sur Vercel, `VERCEL_TOKEN` est automatiquement injecté. Vous pouvez l'omettre ou le laisser vide.
 
 3. Appliquez ces variables à tous les environnements (Production, Preview, Development)
 
@@ -137,34 +147,33 @@ vercel
 3. Importez votre dépôt GitHub
 4. Vercel détectera automatiquement la configuration et déploiera
 
-### 4. Vérifier la connexion KV
+### 4. Vérifier la connexion Edge Config
 
-Après avoir configuré les variables d'environnement, testez la connexion à Vercel KV :
+Après avoir configuré les variables d'environnement, testez la connexion à Edge Config :
 
-1. Accédez à : `https://votre-projet.vercel.app/api/health-kv`
+1. Accédez à : `https://votre-projet.vercel.app/api/health-edge-config`
 2. Vous devriez voir un JSON avec le statut de la connexion :
    ```json
    {
      "timestamp": "2024-01-01T00:00:00.000Z",
-     "kv_configured": true,
-     "kv_connected": true,
+     "edge_config_configured": true,
+     "edge_config_connected": true,
      "env_vars": {
-       "KV_REST_API_URL": "https://...",
-       "KV_REST_API_TOKEN": "...",
-       "has_url": true,
-       "has_token": true
+       "EDGE_CONFIG": "https://edge-config.vercel.com/ecfg_xxx...",
+       "EDGE_CONFIG_ID": "ecfg_xxx",
+       "has_edge_config": true,
+       "has_id": true
      },
      "test_result": {
-       "write": "OK",
        "read": "OK",
        "main_key_exists": false
      }
    }
    ```
 
-**Si vous voyez `kv_configured: false` ou `kv_connected: false`** :
-- Vérifiez que les variables d'environnement sont bien configurées dans Vercel Dashboard
-- Assurez-vous que la base KV est bien créée et liée au projet
+**Si vous voyez `edge_config_configured: false` ou `edge_config_connected: false`** :
+- Vérifiez que la variable `EDGE_CONFIG` est bien configurée dans Vercel Dashboard
+- Assurez-vous que l'Edge Config Store est bien créé et lié au projet
 - Redéployez l'application après avoir ajouté les variables
 
 ### 5. Vérifier le déploiement
@@ -231,16 +240,17 @@ Les couleurs sont définies dans `public/css/styles.css` via les variables CSS :
 
 ### Les données ne se sauvegardent pas
 
-1. **Testez la connexion KV** : Accédez à `/api/health-kv` pour voir l'état de la connexion
+1. **Testez la connexion Edge Config** : Accédez à `/api/health-edge-config` pour voir l'état de la connexion
 2. **Vérifiez les variables d'environnement** :
    - Allez dans Vercel Dashboard > Settings > Environment Variables
-   - Assurez-vous que `KV_REST_API_URL` et `KV_REST_API_TOKEN` sont présentes
-   - Vérifiez qu'elles sont appliquées à tous les environnements (Production, Preview, Development)
-3. **Vérifiez que la base KV est liée au projet** :
-   - Vercel Dashboard > Storage > [votre base KV] > Settings
-   - Vérifiez que le projet est bien lié
+   - Assurez-vous que `EDGE_CONFIG` est présente
+   - Vérifiez qu'elle est appliquée à tous les environnements (Production, Preview, Development)
+3. **Vérifiez que l'Edge Config Store est lié au projet** :
+   - Vercel Dashboard > Storage > [votre Edge Config Store] > Settings
+   - Vérifiez que le projet est bien lié dans l'onglet "Linked Projects"
 4. **Vérifiez les logs** : Vercel Dashboard > Deployments > [votre déploiement] > Functions > Logs
-5. **Redéployez** après avoir modifié les variables d'environnement
+5. **Pour l'écriture** : Assurez-vous que `VERCEL_TOKEN` est configuré (ou laissez Vercel l'injecter automatiquement en production)
+6. **Redéployez** après avoir modifié les variables d'environnement
 
 ### Erreur "Code d'accès incorrect"
 
@@ -252,13 +262,22 @@ Les couleurs sont définies dans `public/css/styles.css` via les variables CSS :
 - Vérifiez la console du navigateur pour les erreurs JavaScript
 - Assurez-vous que les fichiers CSS et JS sont bien chargés
 - Vérifiez que l'API `/api/get-bandeau` répond correctement
+- Testez la connexion Edge Config avec `/api/health-edge-config`
+
+### Erreur "Edge Config non configuré"
+
+- Vérifiez que la variable `EDGE_CONFIG` est bien définie dans Vercel
+- Le format doit être : `https://edge-config.vercel.com/ecfg_xxx` ou juste `ecfg_xxx`
+- Assurez-vous que l'Edge Config Store est bien créé et lié au projet
 
 ## 📝 Notes techniques
 
 - **Runtime** : Edge Functions (Vercel Edge Runtime)
-- **Stockage** : Vercel KV (Redis compatible)
+- **Stockage** : Edge Config (latence ultra-faible, parfait pour la configuration)
+- **Écriture** : Via API REST Vercel (nécessite VERCEL_TOKEN)
 - **Fallback** : localStorage utilisé en cas d'échec de l'API
-- **Migration automatique** : Les données localStorage sont migrées vers l'API au premier chargement
+- **Migration automatique** : Les données localStorage sont migrées vers Edge Config au premier chargement
+- **Limite Edge Config** : 8 KB par store (largement suffisant pour le bandeau)
 
 ## 📄 Licence
 

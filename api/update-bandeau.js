@@ -1,21 +1,88 @@
 /**
- * API Route POST - Met à jour les données du bandeau dans Vercel KV Edge
+ * API Route POST - Met à jour les données du bandeau dans Edge Config
  * Sécurisé avec authentification via ACCESS_CODE et validation des données
+ * Utilise l'API REST Vercel pour l'écriture (Edge Config est en lecture seule sur Edge Runtime)
  */
 
-import { kv } from '@vercel/kv';
+import { get } from '@vercel/edge-config';
 
-// Initialisation explicite du client KV pour Edge Runtime
-let kvClient = kv;
-
-// Vérification de la configuration KV au chargement
-if (!process.env.KV_REST_API_URL || !process.env.KV_REST_API_TOKEN) {
-  console.warn('⚠️ Variables d\'environnement KV non configurées');
+// Vérification de la configuration Edge Config au chargement
+if (!process.env.EDGE_CONFIG) {
+  console.warn('⚠️ Variable d\'environnement EDGE_CONFIG non configurée');
 }
 
 export const config = {
   runtime: 'edge',
 };
+
+/**
+ * Extrait l'ID Edge Config depuis la connection string
+ * Format: https://edge-config.vercel.com/ecfg_xxx ou ecfg_xxx
+ */
+function getEdgeConfigId() {
+  const edgeConfig = process.env.EDGE_CONFIG;
+  if (!edgeConfig) return null;
+  
+  // Si c'est une URL, extraire l'ID
+  const match = edgeConfig.match(/ecfg_[a-zA-Z0-9]+/);
+  if (match) {
+    return match[0];
+  }
+  
+  // Si c'est déjà un ID
+  if (edgeConfig.startsWith('ecfg_')) {
+    return edgeConfig;
+  }
+  
+  return null;
+}
+
+/**
+ * Met à jour Edge Config via l'API REST Vercel
+ */
+async function updateEdgeConfig(key, value) {
+  const edgeConfigId = getEdgeConfigId();
+  if (!edgeConfigId) {
+    throw new Error('Edge Config ID non trouvé dans EDGE_CONFIG');
+  }
+
+  // Utiliser le token Vercel automatique (disponible dans les fonctions Edge)
+  const vercelToken = process.env.VERCEL_TOKEN || process.env.VERCEL_API_TOKEN;
+  if (!vercelToken) {
+    // En production, Vercel injecte automatiquement le token
+    // En développement local, il faut le définir manuellement
+    throw new Error('VERCEL_TOKEN ou VERCEL_API_TOKEN requis pour l\'écriture');
+  }
+
+  const response = await fetch(
+    `https://api.vercel.com/v1/edge-config/${edgeConfigId}/items`,
+    {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `Bearer ${vercelToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        items: [
+          {
+            key: key,
+            value: value,
+          },
+        ],
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(
+      errorData.error?.message || 
+      `Erreur API Vercel: ${response.status} ${response.statusText}`
+    );
+  }
+
+  return await response.json();
+}
 
 /**
  * Sanitize HTML pour prévenir les attaques XSS
@@ -123,6 +190,9 @@ export default async function handler(req) {
           status: 400,
           headers: {
             'Content-Type': 'application/json',
+            'X-Content-Type-Options': 'nosniff',
+            'X-Frame-Options': 'DENY',
+            'X-XSS-Protection': '1; mode=block',
           },
         }
       );
@@ -142,17 +212,20 @@ export default async function handler(req) {
           status: 400,
           headers: {
             'Content-Type': 'application/json',
+            'X-Content-Type-Options': 'nosniff',
+            'X-Frame-Options': 'DENY',
+            'X-XSS-Protection': '1; mode=block',
           },
         }
       );
     }
 
-    // Vérifier que KV est configuré
-    if (!process.env.KV_REST_API_URL || !process.env.KV_REST_API_TOKEN) {
+    // Vérifier que Edge Config est configuré
+    if (!process.env.EDGE_CONFIG) {
       return new Response(
         JSON.stringify({ 
-          error: 'KV non configuré',
-          details: 'Les variables d\'environnement KV_REST_API_URL et KV_REST_API_TOKEN doivent être configurées'
+          error: 'Edge Config non configuré',
+          details: 'La variable d\'environnement EDGE_CONFIG doit être configurée'
         }),
         {
           status: 503,
@@ -174,8 +247,9 @@ export default async function handler(req) {
       updatedAt: new Date().toISOString(),
     };
 
-    // Sauvegarder dans Vercel KV
-    await kvClient.set('bandeau:data', dataToSave);
+    // Sauvegarder dans Edge Config via API REST
+    // Edge Config stocke des valeurs simples, on stringifie le JSON
+    await updateEdgeConfig('bandeau_data', JSON.stringify(dataToSave));
 
     return new Response(
       JSON.stringify({ 
@@ -196,7 +270,8 @@ export default async function handler(req) {
     console.error('Error updating bandeau data:', error);
     console.error('Error details:', {
       message: error.message,
-      kv_configured: !!(process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN),
+      edge_config_configured: !!process.env.EDGE_CONFIG,
+      edge_config_id: getEdgeConfigId(),
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
     });
 
@@ -210,6 +285,9 @@ export default async function handler(req) {
           status: 400,
           headers: {
             'Content-Type': 'application/json',
+            'X-Content-Type-Options': 'nosniff',
+            'X-Frame-Options': 'DENY',
+            'X-XSS-Protection': '1; mode=block',
           },
         }
       );
@@ -218,7 +296,8 @@ export default async function handler(req) {
     return new Response(
       JSON.stringify({ 
         error: 'Internal server error',
-        message: 'Une erreur est survenue lors de la sauvegarde'
+        message: 'Une erreur est survenue lors de la sauvegarde',
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined,
       }),
       {
         status: 500,
@@ -232,4 +311,3 @@ export default async function handler(req) {
     );
   }
 }
-
