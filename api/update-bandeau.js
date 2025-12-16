@@ -65,6 +65,7 @@ async function updateEdgeConfig(key, value) {
       body: JSON.stringify({
         items: [
           {
+            operation: 'upsert',
             key: key,
             value: value,
           },
