@@ -1,0 +1,225 @@
+/* Styles généraux et couleurs */
+:root { 
+  --panel-bg: rgba(0,0,0,0.75); 
+  --accent: #00BFFF; /* Couleur fixe utilisée pour l'interface */
+  --gyrophare-glow: rgba(0, 191, 255, 1);
+  --hex-color: #0d2836; 
+  --scroll-text-color: white; /* Couleur du texte principal (modifiable) */
+  
+  /* Couleurs pour les statuts */
+  --status-red: #FF4500;
+  --status-yellow: #FFFF00;
+  --status-blue: #00BFFF;
+  --status-white: #FFFFFF; /* NOUVEAU: Couleur pour la réinitialisation */
+}
+
+/* Classes CSS pour le texte coloré */
+.status-red { color: var(--status-red); font-weight: bold; }
+.status-yellow { color: var(--status-yellow); font-weight: bold; }
+.status-blue { color: var(--status-blue); font-weight: bold; }
+.status-white { color: var(--status-white); font-weight: normal; } /* NOUVEAU: Remet la couleur blanche */
+
+/* Style de l'éditeur contenteditable */
+#editor {
+    min-height: 100px;
+    border: 1px solid #444;
+    padding: 10px;
+    margin-bottom: 10px;
+    border-radius: 4px;
+    white-space: pre-wrap; /* Conserve le formatage des sauts de ligne */
+    overflow-y: auto;
+    color: white; /* Important pour l'éditeur */
+    background-color: #111;
+    font-family: Arial, sans-serif;
+    font-size: 1em;
+}
+
+/* FOND D'ÉCRAN HEXAGONAL (vue normale) */
+body { 
+    background: 
+        linear-gradient(217deg, rgba(0,0,0,0.8), rgba(0,0,0,0.1) 70.7%),
+        linear-gradient(127deg, rgba(0,0,0,0.8), rgba(0,0,0,0.1) 70.7%),
+        linear-gradient(336deg, rgba(0,0,0,0.8), rgba(0,0,0,0.1) 70.7%),
+        #000;
+    color: white; 
+    font-size: 2rem; 
+    margin: 0; 
+    font-family: Arial, sans-serif; 
+    position: relative;
+    background-image: 
+        linear-gradient(to right, var(--hex-color) 1px, transparent 1px),
+        linear-gradient(to bottom, var(--hex-color) 1px, transparent 1px);
+    background-size: 50px 50px; 
+    box-shadow: inset 0 0 100px rgba(0, 191, 255, 0.1);
+    margin-bottom: 5cm; 
+}
+
+/* Conteneur du bandeau (positionné en bas en vue normale) */
+.container { 
+    position: fixed; 
+    bottom: 0; 
+    left: 0;
+    width: 100vw; 
+    height: 5cm; 
+    display: flex; 
+    align-items: center; 
+    justify-content: flex-start; 
+    overflow: hidden; 
+    background: rgba(0,0,0,0.8); 
+    border-top: 3px solid var(--accent); 
+    z-index: 100; 
+    position: relative; 
+}
+
+/* Le conteneur d'animation */
+.scroll { 
+    animation: horizontalScroll 15s linear infinite; 
+    white-space: nowrap; 
+    display: flex;
+    color: var(--scroll-text-color); 
+    transform: translateX(0%); 
+    width: max-content; 
+}
+
+/* L'animation de défilement CONTINU (pas de pause) */
+@keyframes horizontalScroll { 
+    0% { transform: translateX(0%); } 
+    100% { transform: translateX(-50%); } 
+}
+
+/* Styles de l'éditeur et des boutons */
+.editor-panel { position: fixed; top: 20px; left: 20px; background: var(--panel-bg); padding: 14px; border-radius: 12px; width: 320px; font-size: 1rem; box-shadow: 0 6px 18px rgba(0,0,0,0.6); color: #fff; z-index: 999; }
+.editor-panel input[type="color"] { width: 100px; height: 30px; border: none; padding: 0; border-radius: 4px; vertical-align: middle; }
+.action-btn { 
+    position: fixed; 
+    right: 20px; 
+    padding: 10px 14px; 
+    border-radius: 8px; 
+    border: none; 
+    cursor: pointer; 
+    background: var(--accent); 
+    color: #000; 
+    font-weight: 600; 
+    z-index: 101; 
+}
+
+/* Styles spécifiques pour les boutons de couleur */
+.editor-panel .color-apply-btn {
+    flex-grow: 1;
+    padding: 8px 10px;
+    font-size: 0.9em;
+    color: white;
+    border-radius: 4px;
+    cursor: pointer;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    font-weight: bold;
+    text-shadow: 0 0 3px rgba(0,0,0,0.5);
+    white-space: nowrap; 
+}
+
+/* Styles des gyrophares */
+.gyrophare-wrapper {
+    position: absolute; 
+    top: 0; 
+    left: 0; 
+    right: 0; 
+    height: 100%; 
+    display: flex;
+    align-items: center; 
+    justify-content: space-between; 
+    padding: 0 20px; 
+    z-index: 99; 
+}
+.gyrophare { 
+    width: 30px; 
+    max-width: 30px; 
+    height: 30px; 
+    max-height: 30px;
+    border-radius: 50%; 
+    background-color: transparent; 
+    animation: none; 
+    position: relative; 
+    box-shadow: none; 
+    z-index: 3; 
+}
+.gyrophare::before { content: ''; display: none; }
+
+.gyrophare::after { 
+    content: ''; 
+    position: absolute; 
+    width: 60vw; 
+    height: 60vw; 
+    border-radius: 50%; 
+    background: radial-gradient(circle, var(--gyrophare-glow) 0%, rgba(0, 0, 0, 0) 60%); 
+    opacity: 0; 
+    z-index: 2; 
+    top: 50%; 
+    transform: translateY(-50%); 
+}
+.gyrophare-wrapper > .gyrophare:first-child::after { 
+    left: 20px; 
+    transform: translate(-50%, -50%); 
+} 
+.gyrophare-wrapper > .gyrophare:last-child::after { 
+    right: 20px; 
+    transform: translate(50%, -50%); 
+} 
+
+@keyframes flash-opacity { 0%, 30% { opacity: 0; } 50% { opacity: 0.6; } 50.1%, 100% { opacity: 0; } }
+.gyrophare::after { animation: flash-opacity 0.8s infinite alternate; }
+.gyrophare-wrapper > .gyrophare:last-child::after { animation-delay: 0.4s; }
+.blue-check-svg { height: 1.2em; width: 1.2em; vertical-align: middle; margin: 0 15px; display: inline-block; fill: var(--accent); }
+
+/* Conteneur du contenu intérieur du défilement */
+.scroll-content {
+    white-space: nowrap;
+    display: flex;
+    width: max-content; 
+}
+
+/* ---------------------------------------------------------------------- */
+/* Configuration du mode Pseudo Plein écran (Réduction à 5cm) */
+/* ---------------------------------------------------------------------- */
+
+.pseudo-fullscreen {
+    overflow: hidden !important; 
+}
+.pseudo-fullscreen body {
+    background: transparent !important; 
+    margin-bottom: 0 !important; 
+    height: 100vh; 
+}
+
+/* 1. Cache TOUT ce qui n'est pas un script ou le bandeau ou les boutons */
+.pseudo-fullscreen body > *:not(.container):not([id="togglePanel"]):not([id="fullscreenBtn"]):not(script) { 
+    display: none !important; 
+}
+
+/* 2. Révèle et positionne les boutons d'action */
+.pseudo-fullscreen #togglePanel,
+.pseudo-fullscreen #fullscreenBtn {
+    display: block !important; 
+    z-index: 101 !important; 
+}
+
+/* 3. Révèle et repositionne le BANDEAU (container) en HAUT avec une hauteur de 5cm */
+.pseudo-fullscreen .container { 
+    display: flex !important; 
+    position: fixed !important; 
+    top: 0 !important; 
+    bottom: auto !important; 
+    left: 0 !important; 
+    width: 100% !important; 
+    height: 5cm !important; 
+    background: black !important; 
+    z-index: 100 !important; 
+    border-top: none !important; 
+    border-bottom: 3px solid var(--accent) !important; 
+}
+.pseudo-fullscreen .scroll { 
+    font-size: 2.2rem; 
+}
+
+/* Classe de masquage de l'éditeur (pour la logique JS) */
+.editor-hidden { display: none !important; }
+

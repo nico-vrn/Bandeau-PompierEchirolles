@@ -1,0 +1,26 @@
+{
+  "name": "bandeau-pompier-echirolles",
+  "version": "1.0.0",
+  "description": "Bandeau d'information défilant pour les pompiers d'Échirolles avec API Vercel et stockage KV",
+  "main": "index.js",
+  "scripts": {
+    "dev": "vercel dev",
+    "build": "echo 'No build step required'",
+    "start": "vercel dev"
+  },
+  "keywords": [
+    "bandeau",
+    "pompier",
+    "vercel",
+    "kv"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@vercel/kv": "^0.2.0"
+  },
+  "engines": {
+    "node": ">=18.x"
+  }
+}
+
