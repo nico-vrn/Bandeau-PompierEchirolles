@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@vercel/blob": "^2.0.1",
-    "@vercel/edge-config": "^1.4.3"
+    "@vercel/edge-config": "^1.4.3",
+    "formidable": "^3.5.2"
   }
 }
