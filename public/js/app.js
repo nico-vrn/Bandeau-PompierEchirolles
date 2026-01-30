@@ -21,6 +21,15 @@ const root = document.documentElement;
 // Variable globale pour stocker le code d'accès
 let currentAccessCode = null;
 
+// Variable globale pour stocker le timestamp de dernière modification
+let lastKnownModified = null;
+
+// Variable pour stocker l'intervalle de polling
+let pollingInterval = null;
+
+// Variable globale pour stocker la direction actuelle
+let currentDirection = 'horizontal';
+
 /**
  * Affiche une notification à l'utilisateur
  * @param {string} message - Message à afficher
@@ -83,13 +92,25 @@ function applyColorClassToSelection(className) {
  * Fonction qui prépare le HTML pour le bandeau défilant
  */
 function prepareScrollContent(htmlContent){ 
+    // En mode vertical, on garde les <br> pour les sauts de ligne
+    if (currentDirection === 'vertical') {
+        // Pour le mode vertical, formater le contenu en divs séparés
+        let cleanContent = htmlContent;
+        cleanContent = cleanContent.replace(/<div>/gi, '').replace(/<\/div>/gi, '');
+        cleanContent = cleanContent.replace(/<p>/gi, '').replace(/<\/p>/gi, '');
+        // Remplacer les <br> par des divs pour meilleur défilement vertical
+        cleanContent = cleanContent.replace(/<br\s*\/?>/gi, '</div><div style="padding: 25px 15px; text-align: center; white-space: normal; word-wrap: break-word; line-height: 1.4;">');
+        return '<div style="padding: 25px 15px; text-align: center; white-space: normal; word-wrap: break-word; line-height: 1.4;">' + cleanContent.trim() + '</div>';
+    }
+    
+    // Mode horizontal (par défaut)
     // 1. Remplace les <br> par un espace pour le défilement
     let cleanContent = htmlContent.replace(/<br>/gi, ' ');
 
     // 2. Supprime les éléments de bloc (div/p) ajoutés par l'éditeur contenteditable
     cleanContent = cleanContent.replace(/<div>/gi, ' ').replace(/<\/div>/gi, '');
     cleanContent = cleanContent.replace(/<p>/gi, ' ').replace(/<\/p>/gi, '');
-    
+
     // 3. Normalise les espaces multiples
     cleanContent = cleanContent.replace(/\s+/g, ' ');
 
@@ -104,17 +125,36 @@ function prepareScrollContent(htmlContent){
 function updateScrollFromHtml(htmlContent){ 
     let rawContent = prepareScrollContent(htmlContent);
     
-    // Duplication du contenu (2 FOIS) pour un défilement continu
+    // Duplication du contenu (2 FOIS) pour un défilement continu en boucle
+    // Important : la duplication doit être faite de manière à créer une boucle infinie
     let duplicatedContent = rawContent + rawContent;
 
-    document.getElementById('scrollContent').innerHTML = duplicatedContent;
+    const scrollContent = document.getElementById('scrollContent');
+    if (scrollContent) {
+        scrollContent.innerHTML = duplicatedContent;
+        
+        // En mode vertical, s'assurer que le contenu est bien structuré pour la boucle
+        if (currentDirection === 'vertical') {
+            scrollContent.style.display = 'flex';
+            scrollContent.style.flexDirection = 'column';
+            scrollContent.style.height = 'max-content';
+        } else {
+            scrollContent.style.display = 'flex';
+            scrollContent.style.flexDirection = 'row';
+            scrollContent.style.width = 'max-content';
+        }
+    }
 }
+
 
 /**
  * Définit la durée de l'animation de défilement
  */
 function setScrollDuration(seconds){ 
-    document.getElementById('scroll').style.animationDuration = seconds + 's'; 
+    const scroll = document.getElementById('scroll');
+    if (scroll) {
+        scroll.style.animationDuration = seconds + 's';
+    }
 }
 
 /**
@@ -122,6 +162,67 @@ function setScrollDuration(seconds){
  */
 function setScrollColor(color){
     root.style.setProperty('--scroll-text-color', color);
+}
+
+/**
+ * Définit la direction du défilement (horizontal ou vertical)
+ */
+function setScrollDirection(direction) {
+    const container = document.querySelector('.container');
+    const scroll = document.getElementById('scroll');
+    const directionBtn = document.getElementById('directionBtn');
+    const gyrophareWrapper = document.querySelector('.gyrophare-wrapper');
+    
+    if (!container || !scroll || !directionBtn) return;
+    
+    // IMPORTANT : Mettre à jour currentDirection AVANT tout le reste
+    currentDirection = direction;
+    
+    // Retirer toutes les classes de direction
+    container.classList.remove('container-horizontal', 'container-vertical');
+    scroll.classList.remove('scroll-horizontal', 'scroll-vertical');
+    
+    if (direction === 'vertical') {
+        container.classList.add('container-vertical');
+        scroll.classList.add('scroll-vertical');
+        directionBtn.textContent = '↕ Vertical';
+        directionBtn.title = 'Changer en mode horizontal';
+        
+        // Adapter les gyrophares pour le mode vertical (haut et bas)
+        if (gyrophareWrapper) {
+            gyrophareWrapper.style.flexDirection = 'column';
+            gyrophareWrapper.style.justifyContent = 'space-between';
+            gyrophareWrapper.style.alignItems = 'center';
+            gyrophareWrapper.style.padding = '20px 0';
+        }
+    } else {
+        container.classList.add('container-horizontal');
+        scroll.classList.add('scroll-horizontal');
+        directionBtn.textContent = '↔ Horizontal';
+        directionBtn.title = 'Changer en mode vertical';
+        
+        // Remettre les gyrophares en mode horizontal (gauche et droite)
+        if (gyrophareWrapper) {
+            gyrophareWrapper.style.flexDirection = 'row';
+            gyrophareWrapper.style.justifyContent = 'space-between';
+            gyrophareWrapper.style.alignItems = 'center';
+            gyrophareWrapper.style.padding = '0 20px';
+        }
+    }
+    
+    // Recharger et REFORMATER le contenu avec la nouvelle direction
+    // prepareScrollContent() va utiliser currentDirection pour formater correctement
+    const editor = document.getElementById('editor');
+    if (editor) {
+        updateScrollFromHtml(editor.innerHTML);
+    }
+    
+    // Réappliquer la vitesse actuelle pour s'assurer qu'elle fonctionne avec la nouvelle direction
+    const speedInput = document.getElementById('speed');
+    if (speedInput) {
+        const currentSpeed = parseInt(speedInput.value, 10) || 5;
+        setScrollDuration(currentSpeed);
+    }
 }
 
 /**
@@ -149,50 +250,34 @@ async function toggleEditorPanel(){
     // Stocker le code d'accès pour les sauvegardes
     currentAccessCode = userCode;
     
+    // Passer en mode édition (sortir du mode bando)
+    exitPseudoFullscreen();
     panel.classList.remove('editor-hidden');
     btn.textContent = 'Cacher l\'éditeur';
   } else {
-    panel.classList.add('editor-hidden');
-    btn.textContent = 'Afficher l\'éditeur';
-    // Optionnel : réinitialiser le code d'accès pour plus de sécurité
-    // currentAccessCode = null;
+    // Retourner en mode bando - recharger la page pour garantir l'affichage correct
+    // Cela permet de recharger le contenu avec le bon formatage selon la direction
+    location.reload();
   }
 }
 
 let isInPseudoFullscreen = false;
 
 /**
- * Active le mode pseudo plein écran
+ * Active le mode pseudo plein écran (mode bando)
  */
 function enterPseudoFullscreen(){ 
     document.documentElement.classList.add('pseudo-fullscreen'); 
     isInPseudoFullscreen = true; 
-    document.getElementById('fullscreenBtn').textContent = 'Quitter mode Bando'; 
 }
 
 /**
- * Désactive le mode pseudo plein écran
+ * Désactive le mode pseudo plein écran (mode édition)
  */
 function exitPseudoFullscreen(){ 
     document.documentElement.classList.remove('pseudo-fullscreen'); 
     isInPseudoFullscreen = false; 
-    document.getElementById('fullscreenBtn').textContent = 'Mode Affichage Bando'; 
 }
-
-/**
- * Bascule le mode pseudo plein écran
- */
-function toggleFullscreen(){ 
-    if (isInPseudoFullscreen) {
-        exitPseudoFullscreen();
-    } else {
-        enterPseudoFullscreen(); 
-    }
-}
-
-// Initialisation de l'interface au chargement
-document.querySelector('.editor-panel').classList.add('editor-hidden');
-document.getElementById('togglePanel').textContent = 'Afficher l\'éditeur';
 
 /**
  * Initialisation de l'application au chargement du DOM
@@ -211,13 +296,18 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   let data;
   try {
     data = await loadBandeauData();
+    // Stocker le timestamp de dernière modification
+    lastKnownModified = data.lastModified || new Date().toISOString();
+    localStorage.setItem('bandeau_last_modified', lastKnownModified);
   } catch (error) {
     console.error('Erreur lors du chargement des données:', error);
     data = {
       html: defaultMessagesHTML,
       speed: 5,
-      color: DEFAULT_COLOR
+      color: DEFAULT_COLOR,
+      lastModified: new Date().toISOString()
     };
+    lastKnownModified = data.lastModified;
   }
 
   let htmlToLoad = data.html || '';
@@ -232,6 +322,11 @@ document.addEventListener('DOMContentLoaded', async ()=>{
       htmlToLoad = defaultMessagesHTML;
   }
   
+  // CHARGEMENT DE LA DIRECTION (avant le HTML pour que prepareScrollContent utilise la bonne direction)
+  const initialDirection = data.direction || 'horizontal';
+  currentDirection = initialDirection;
+  setScrollDirection(initialDirection);
+
   editor.innerHTML = htmlToLoad;
   updateScrollFromHtml(editor.innerHTML);
 
@@ -246,12 +341,12 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   colorInput.value = initialColor;
   setScrollColor(initialColor);
   
-  if (!isPanelVisible(panel)) {
-    panel.classList.add('editor-hidden');
-    toggleBtn.textContent = 'Afficher l\'éditeur';
-  } else {
-    toggleBtn.textContent = 'Cacher l\'éditeur';
-  }
+  // Initialiser l'interface en mode bando (éditeur caché par défaut)
+  panel.classList.add('editor-hidden');
+  toggleBtn.textContent = 'Afficher l\'éditeur';
+  
+  // Activer le mode bando par défaut APRÈS avoir configuré la direction et le contenu
+  enterPseudoFullscreen();
 
   // Bouton de mise à jour
   document.getElementById('updateBtn').addEventListener('click', async ()=>{ 
@@ -266,10 +361,19 @@ document.addEventListener('DOMContentLoaded', async ()=>{
       showNotification('Sauvegarde en cours...', 'info', 2000);
       
       // Sauvegarde via API avec le code d'accès
-      const result = await saveBandeauData(html, speed, color, currentAccessCode);
+      const result = await saveBandeauData(html, speed, color, currentDirection, currentAccessCode);
       
       if (result.success) {
         showNotification(result.message, 'success', 5000);
+        // Mettre à jour le timestamp local après sauvegarde réussie
+        // Le polling détectera la mise à jour sur les autres navigateurs
+        setTimeout(async () => {
+          const updateCheck = await checkForUpdates();
+          if (updateCheck.lastModified) {
+            lastKnownModified = updateCheck.lastModified;
+            localStorage.setItem('bandeau_last_modified', lastKnownModified);
+          }
+        }, 500);
       } else {
         if (result.localOnly) {
           showNotification(result.message, 'warning', 6000);
@@ -298,10 +402,18 @@ document.addEventListener('DOMContentLoaded', async ()=>{
       showNotification('Réinitialisation en cours...', 'info', 2000);
       
       // Sauvegarde via API avec le code d'accès
-      const result = await saveBandeauData(initialHtml, initialSpeed, initialColor, currentAccessCode);
+      const result = await saveBandeauData(initialHtml, initialSpeed, initialColor, currentDirection, currentAccessCode);
       
       if (result.success) {
         showNotification('Réinitialisation sauvegardée avec succès dans la base de données', 'success', 5000);
+        // Mettre à jour le timestamp local après sauvegarde réussie
+        setTimeout(async () => {
+          const updateCheck = await checkForUpdates();
+          if (updateCheck.lastModified) {
+            lastKnownModified = updateCheck.lastModified;
+            localStorage.setItem('bandeau_last_modified', lastKnownModified);
+          }
+        }, 500);
       } else {
         if (result.localOnly) {
           showNotification(result.message, 'warning', 6000);
@@ -319,7 +431,122 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   blueBtn.addEventListener('click', (e) => { e.preventDefault(); applyColorClassToSelection('status-blue'); });
   
   // Écouteur pour le bouton Blanc
-  whiteBtn.addEventListener('click', (e) => { e.preventDefault(); applyColorClassToSelection('status-white'); }); 
+  whiteBtn.addEventListener('click', (e) => { e.preventDefault(); applyColorClassToSelection('status-white'); });
+
+  // GESTION DE LA DIRECTION
+  const directionBtn = document.getElementById('directionBtn');
+  let directionSaveTimeout = null;
+  
+  directionBtn.addEventListener('click', async () => {
+    if (!currentAccessCode) {
+      showNotification('Veuillez d\'abord ouvrir l\'éditeur avec le code d\'accès', 'warning', 4000);
+      return;
+    }
+    
+    // Basculer la direction
+    const newDirection = currentDirection === 'horizontal' ? 'vertical' : 'horizontal';
+    setScrollDirection(newDirection);
+    
+    // Sauvegarder automatiquement avec debounce
+    clearTimeout(directionSaveTimeout);
+    directionSaveTimeout = setTimeout(async () => {
+      const html = editor.innerHTML;
+      const speed = parseInt(document.getElementById('speed').value, 10);
+      const color = colorInput.value;
+      
+      const result = await saveBandeauData(html, speed, color, newDirection, currentAccessCode);
+      if (result.success) {
+        showNotification('Direction sauvegardée', 'success', 3000);
+        // Mettre à jour le timestamp local
+        setTimeout(async () => {
+          const updateCheck = await checkForUpdates();
+          if (updateCheck.lastModified) {
+            lastKnownModified = updateCheck.lastModified;
+            localStorage.setItem('bandeau_last_modified', lastKnownModified);
+          }
+        }, 500);
+      } else if (!result.localOnly) {
+        showNotification('Erreur lors de la sauvegarde de la direction', 'error', 4000);
+      }
+    }, 500);
+  });
+
+  // GESTION DE L'INSERTION D'IMAGES
+  const insertImageBtn = document.getElementById('insertImageBtn');
+  const imageInput = document.getElementById('imageInput');
+
+  insertImageBtn.addEventListener('click', () => {
+    if (!currentAccessCode) {
+      showNotification('Veuillez d\'abord ouvrir l\'éditeur avec le code d\'accès', 'warning', 4000);
+      return;
+    }
+    imageInput.click();
+  });
+
+  imageInput.addEventListener('change', async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Afficher un message de chargement
+    showNotification('Upload de l\'image en cours...', 'info', 5000);
+
+    // Uploader l'image
+    const result = await uploadImage(file, currentAccessCode);
+
+    if (result.success && result.url) {
+      // Insérer l'image dans l'éditeur
+      const img = document.createElement('img');
+      img.src = result.url;
+      img.alt = file.name;
+
+      // Insérer à la position du curseur ou à la fin
+      const selection = window.getSelection();
+      if (selection.rangeCount > 0) {
+        const range = selection.getRangeAt(0);
+        range.deleteContents();
+        range.insertNode(img);
+      } else {
+        editor.appendChild(img);
+      }
+
+      // Ajouter un espace après l'image
+      const space = document.createTextNode(' ');
+      if (selection.rangeCount > 0) {
+        const range = selection.getRangeAt(0);
+        range.setStartAfter(img);
+        range.insertNode(space);
+      } else {
+        editor.appendChild(space);
+      }
+
+      showNotification('Image insérée avec succès', 'success', 3000);
+      
+      // Sauvegarder automatiquement après insertion
+      const html = editor.innerHTML;
+      const speed = parseInt(document.getElementById('speed').value, 10);
+      const color = colorInput.value;
+      
+      updateScrollFromHtml(html);
+      
+      const saveResult = await saveBandeauData(html, speed, color, currentDirection, currentAccessCode);
+      if (saveResult.success) {
+        showNotification('Image sauvegardée', 'success', 2000);
+        // Mettre à jour le timestamp local
+        setTimeout(async () => {
+          const updateCheck = await checkForUpdates();
+          if (updateCheck.lastModified) {
+            lastKnownModified = updateCheck.lastModified;
+            localStorage.setItem('bandeau_last_modified', lastKnownModified);
+          }
+        }, 500);
+      }
+    } else {
+      showNotification(result.error || 'Erreur lors de l\'upload de l\'image', 'error', 5000);
+    }
+
+    // Réinitialiser l'input pour permettre de sélectionner le même fichier à nouveau
+    imageInput.value = '';
+  }); 
 
   // GESTION DE LA VITESSE
   let speedSaveTimeout = null;
@@ -335,9 +562,17 @@ document.addEventListener('DOMContentLoaded', async ()=>{
         speedSaveTimeout = setTimeout(async () => {
           const html = editor.innerHTML;
           const color = colorInput.value;
-          const result = await saveBandeauData(html, val, color, currentAccessCode);
+          const result = await saveBandeauData(html, val, color, currentDirection, currentAccessCode);
           if (result.success) {
             showNotification('Vitesse sauvegardée', 'success', 3000);
+            // Mettre à jour le timestamp local
+            setTimeout(async () => {
+              const updateCheck = await checkForUpdates();
+              if (updateCheck.lastModified) {
+                lastKnownModified = updateCheck.lastModified;
+                localStorage.setItem('bandeau_last_modified', lastKnownModified);
+              }
+            }, 500);
           } else if (!result.localOnly) {
             showNotification('Erreur lors de la sauvegarde de la vitesse', 'error', 4000);
           }
@@ -358,9 +593,17 @@ document.addEventListener('DOMContentLoaded', async ()=>{
         colorSaveTimeout = setTimeout(async () => {
           const html = editor.innerHTML;
           const speed = parseInt(document.getElementById('speed').value, 10);
-          const result = await saveBandeauData(html, speed, val, currentAccessCode);
+          const result = await saveBandeauData(html, speed, val, currentDirection, currentAccessCode);
           if (result.success) {
             showNotification('Couleur sauvegardée', 'success', 3000);
+            // Mettre à jour le timestamp local
+            setTimeout(async () => {
+              const updateCheck = await checkForUpdates();
+              if (updateCheck.lastModified) {
+                lastKnownModified = updateCheck.lastModified;
+                localStorage.setItem('bandeau_last_modified', lastKnownModified);
+              }
+            }, 500);
           } else if (!result.localOnly) {
             showNotification('Erreur lors de la sauvegarde de la couleur', 'error', 4000);
           }
@@ -381,10 +624,18 @@ document.addEventListener('DOMContentLoaded', async ()=>{
           // Afficher un message de chargement
           showNotification('Sauvegarde en cours...', 'info', 2000);
           
-          const result = await saveBandeauData(html, speed, color, currentAccessCode);
+          const result = await saveBandeauData(html, speed, color, currentDirection, currentAccessCode);
           
           if (result.success) {
             showNotification(result.message, 'success', 5000);
+            // Mettre à jour le timestamp local
+            setTimeout(async () => {
+              const updateCheck = await checkForUpdates();
+              if (updateCheck.lastModified) {
+                lastKnownModified = updateCheck.lastModified;
+                localStorage.setItem('bandeau_last_modified', lastKnownModified);
+              }
+            }, 500);
           } else {
             if (result.localOnly) {
               showNotification(result.message, 'warning', 6000);
@@ -397,13 +648,122 @@ document.addEventListener('DOMContentLoaded', async ()=>{
       } 
   });
 
-  document.getElementById('fullscreenBtn').addEventListener('click', toggleFullscreen); 
-
-  // Écouteur pour la touche Échap
+  // Écouteur pour la touche Échap : fermer l'éditeur et retourner en mode bando
   document.addEventListener('keydown', (e)=>{ 
-    if (e.key === 'Escape' && isInPseudoFullscreen) {
-      exitPseudoFullscreen(); 
+    if (e.key === 'Escape' && isPanelVisible(panel)) {
+      // Recharger la page pour garantir l'affichage correct en mode bando
+      location.reload();
     }
   });
+
+  // Fonction pour mettre à jour l'indicateur de synchronisation
+  function updateSyncIndicator(state) {
+    const indicator = document.getElementById('syncIndicator');
+    if (!indicator) return;
+    
+    indicator.classList.remove('syncing', 'error');
+    
+    switch(state) {
+      case 'syncing':
+        indicator.classList.add('syncing');
+        indicator.title = 'Vérification des mises à jour...';
+        break;
+      case 'error':
+        indicator.classList.add('error');
+        indicator.title = 'Erreur de synchronisation';
+        break;
+      case 'synced':
+      default:
+        indicator.title = 'Synchronisé';
+        break;
+    }
+  }
+
+  // Fonction pour appliquer les données chargées au bandeau
+  async function applyBandeauData(data) {
+    if (!data) return;
+    
+    const editor = document.getElementById('editor');
+    const colorInput = document.getElementById('color');
+    
+    // Mettre à jour le HTML
+    if (data.html !== undefined) {
+      let htmlToLoad = data.html || '';
+      
+      // Heuristique de migration pour les anciens formats
+      if (htmlToLoad && !htmlToLoad.includes('span')) {
+        htmlToLoad = htmlToLoad.replace(/✅/g, CHECKMARK_BLUE_SVG_HTML).replace(/\n\n/g, '<br><br>');
+        htmlToLoad = htmlToLoad.replace(/<c-red>(.*?)<\/c-red>/g, '<span class="status-red">$1</span>');
+        htmlToLoad = htmlToLoad.replace(/<c-yellow>(.*?)<\/c-yellow>/g, '<span class="status-yellow">$1</span>');
+        htmlToLoad = htmlToLoad.replace(/<c-blue>(.*?)<\/c-blue>/g, '<span class="status-blue">$1</span>');
+      } else if (!htmlToLoad) {
+        htmlToLoad = defaultMessagesHTML;
+      }
+      
+      editor.innerHTML = htmlToLoad;
+      updateScrollFromHtml(htmlToLoad);
+    }
+    
+    // Mettre à jour la vitesse
+    if (data.speed !== undefined) {
+      const speed = data.speed || 5;
+      document.getElementById('speed').value = speed;
+      document.getElementById('speedValue').textContent = speed;
+      setScrollDuration(speed);
+    }
+    
+    // Mettre à jour la couleur
+    if (data.color !== undefined) {
+      const color = data.color || DEFAULT_COLOR;
+      colorInput.value = color;
+      setScrollColor(color);
+    }
+    
+    // Mettre à jour la direction
+    if (data.direction !== undefined) {
+      const direction = data.direction || 'horizontal';
+      currentDirection = direction;
+      setScrollDirection(direction);
+    }
+    
+    // Mettre à jour le timestamp
+    if (data.lastModified) {
+      lastKnownModified = data.lastModified;
+      localStorage.setItem('bandeau_last_modified', lastKnownModified);
+    }
+  }
+
+  // Fonction pour vérifier et appliquer les mises à jour
+  async function checkAndApplyUpdates() {
+    updateSyncIndicator('syncing');
+    
+    try {
+      const updateCheck = await checkForUpdates();
+      
+      if (updateCheck.error) {
+        updateSyncIndicator('error');
+        return;
+      }
+      
+      // Comparer les timestamps
+      if (updateCheck.lastModified && updateCheck.lastModified !== lastKnownModified) {
+        // Il y a une mise à jour, charger les données complètes
+        const freshData = await loadBandeauData();
+        await applyBandeauData(freshData);
+        updateSyncIndicator('synced');
+      } else {
+        updateSyncIndicator('synced');
+      }
+    } catch (error) {
+      console.error('Erreur lors de la vérification des mises à jour:', error);
+      updateSyncIndicator('error');
+    }
+  }
+
+  // Démarrer le polling toutes les 15 secondes
+  pollingInterval = setInterval(checkAndApplyUpdates, 15000);
+  
+  // Vérifier immédiatement au chargement (après un court délai pour éviter les conflits)
+  setTimeout(checkAndApplyUpdates, 2000);
 });
 

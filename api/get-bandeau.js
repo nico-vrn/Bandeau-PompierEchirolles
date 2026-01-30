@@ -62,6 +62,8 @@ export default async function handler(req) {
           html: defaultMessagesHTML,
           speed: 5,
           color: DEFAULT_COLOR,
+          direction: 'horizontal',
+          lastModified: new Date().toISOString(),
         }),
         {
           status: 200,
@@ -83,6 +85,8 @@ export default async function handler(req) {
         html: data.html || defaultMessagesHTML,
         speed: data.speed || 5,
         color: data.color || DEFAULT_COLOR,
+        direction: data.direction || 'horizontal',
+        lastModified: data.lastModified || new Date().toISOString(),
       }),
       {
         status: 200,
@@ -108,6 +112,8 @@ export default async function handler(req) {
         html: defaultMessagesHTML,
         speed: 5,
         color: DEFAULT_COLOR,
+        direction: 'horizontal',
+        lastModified: new Date().toISOString(),
         error: 'Failed to load data, using defaults',
         error_details: process.env.NODE_ENV === 'development' ? error.message : undefined,
         edge_config_configured: !!process.env.EDGE_CONFIG,

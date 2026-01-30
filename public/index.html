@@ -20,8 +20,8 @@
     </div>
   </div>
 
-  <button id="togglePanel" class="action-btn" style="top:20px;">Cacher l'éditeur</button>
-  <button id="fullscreenBtn" class="action-btn" style="top:70px;">Mode Affichage Bando</button>
+  <button id="togglePanel" class="action-btn" style="top:20px;">Afficher l'éditeur</button>
+  <div id="syncIndicator" class="sync-indicator" title="État de synchronisation" aria-label="Indicateur de synchronisation"></div>
 
   <div class="editor-panel editor-hidden" role="region" aria-label="Éditeur du bandeau">
     <h3>Modifier le texte</h3>
@@ -48,6 +48,14 @@
 
     <label for="speed">Vitesse du défilement (s) : <span id="speedValue">5</span></label>
     <input id="speed" type="range" min="3" max="60" value="5">
+    <br><br>
+
+    <label>Direction du défilement :</label>
+    <button id="directionBtn" class="color-apply-btn" style="width: 100%; margin-bottom: 10px;">↔ Horizontal</button>
+    <br><br>
+
+    <button id="insertImageBtn" class="color-apply-btn" style="width: 100%; margin-bottom: 10px;">📷 Insérer une image</button>
+    <input type="file" id="imageInput" accept="image/jpeg,image/jpg,image/png,image/gif,image/webp" style="display: none;">
 
     <div class="controls">
       <button id="updateBtn">Mettre à jour</button>

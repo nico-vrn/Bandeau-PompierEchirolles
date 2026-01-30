@@ -95,8 +95,8 @@ function sanitizeHTML(html) {
   }
 
   // Liste des balises autorisées
-  const allowedTags = ['br', 'span', 'svg', 'path'];
-  const allowedAttributes = ['class', 'viewBox', 'd', 'style', 'height', 'width', 'fill', 'vertical-align', 'margin', 'display', 'inline-block'];
+  const allowedTags = ['br', 'span', 'svg', 'path', 'img'];
+  const allowedAttributes = ['class', 'viewBox', 'd', 'style', 'height', 'width', 'fill', 'vertical-align', 'margin', 'display', 'inline-block', 'src', 'alt'];
   
   // Créer un parser simple pour nettoyer le HTML
   // Pour une sécurité maximale, on pourrait utiliser une librairie comme DOMPurify
@@ -111,6 +111,22 @@ function sanitizeHTML(html) {
     /<object/gi,
     /<embed/gi,
   ];
+
+  // Vérifier que les URLs d'images proviennent bien de Vercel Blob Storage
+  // Format attendu : https://*.public.blob.vercel-storage.com/*
+  const imgTags = html.match(/<img[^>]+src=["']([^"']+)["'][^>]*>/gi);
+  if (imgTags) {
+    for (const imgTag of imgTags) {
+      const srcMatch = imgTag.match(/src=["']([^"']+)["']/i);
+      if (srcMatch) {
+        const src = srcMatch[1];
+        // Vérifier que l'URL provient de Vercel Blob Storage
+        if (!src.includes('public.blob.vercel-storage.com') && !src.startsWith('data:image/')) {
+          throw new Error('Les images doivent provenir de Vercel Blob Storage ou être en base64');
+        }
+      }
+    }
+  }
 
   for (const pattern of dangerousPatterns) {
     if (pattern.test(html)) {
@@ -146,6 +162,14 @@ function validateData(data) {
     errors.push('Le champ color est requis et doit être une chaîne de caractères');
   } else if (!/^#[0-9A-F]{6}$/i.test(data.color)) {
     errors.push('La couleur doit être au format hexadécimal (#RRGGBB)');
+  }
+
+  if (data.direction !== undefined && data.direction !== null) {
+    if (typeof data.direction !== 'string') {
+      errors.push('Le champ direction doit être une chaîne de caractères');
+    } else if (data.direction !== 'horizontal' && data.direction !== 'vertical') {
+      errors.push('La direction doit être "horizontal" ou "vertical"');
+    }
   }
 
   if (data.accessCode === undefined || data.accessCode === null) {
@@ -245,7 +269,8 @@ export default async function handler(req) {
       html: sanitizedHTML,
       speed: parseInt(body.speed, 10),
       color: body.color,
-      updatedAt: new Date().toISOString(),
+      direction: body.direction || 'horizontal',
+      lastModified: new Date().toISOString(),
     };
 
     // Sauvegarder dans Edge Config via API REST
