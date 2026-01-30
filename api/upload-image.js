@@ -8,7 +8,7 @@
 import { put } from '@vercel/blob';
 
 export const config = {
-  runtime: 'edge',
+  runtime: 'nodejs',
 };
 
 // Types MIME acceptés
