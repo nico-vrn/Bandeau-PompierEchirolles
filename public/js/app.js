@@ -372,8 +372,19 @@ document.addEventListener('DOMContentLoaded', async ()=>{
           if (updateCheck.lastModified) {
             lastKnownModified = updateCheck.lastModified;
             localStorage.setItem('bandeau_last_modified', lastKnownModified);
+            console.log('💾 [SAVE] Timestamp mis à jour:', lastKnownModified);
           }
         }, 500);
+        // Burst de vérifications pour synchronisation rapide des autres appareils
+        console.log('⚡ [BURST] Programmation de 2 checks rapides (10s et 20s)');
+        setTimeout(() => {
+          console.log('⚡ [BURST] Check rapide #1 (10s après sauvegarde)');
+          checkAndApplyUpdates();
+        }, 10000);
+        setTimeout(() => {
+          console.log('⚡ [BURST] Check rapide #2 (20s après sauvegarde)');
+          checkAndApplyUpdates();
+        }, 20000);
       } else {
         if (result.localOnly) {
           showNotification(result.message, 'warning', 6000);
@@ -414,6 +425,9 @@ document.addEventListener('DOMContentLoaded', async ()=>{
             localStorage.setItem('bandeau_last_modified', lastKnownModified);
           }
         }, 500);
+        // Burst de vérifications pour synchronisation rapide des autres appareils
+        setTimeout(checkAndApplyUpdates, 10000);  // Check à 10s
+        setTimeout(checkAndApplyUpdates, 20000);  // Check à 20s
       } else {
         if (result.localOnly) {
           showNotification(result.message, 'warning', 6000);
@@ -465,6 +479,9 @@ document.addEventListener('DOMContentLoaded', async ()=>{
             localStorage.setItem('bandeau_last_modified', lastKnownModified);
           }
         }, 500);
+        // Burst de vérifications pour synchronisation rapide des autres appareils
+        setTimeout(checkAndApplyUpdates, 10000);  // Check à 10s
+        setTimeout(checkAndApplyUpdates, 20000);  // Check à 20s
       } else if (!result.localOnly) {
         showNotification('Erreur lors de la sauvegarde de la direction', 'error', 4000);
       }
@@ -539,6 +556,9 @@ document.addEventListener('DOMContentLoaded', async ()=>{
             localStorage.setItem('bandeau_last_modified', lastKnownModified);
           }
         }, 500);
+        // Burst de vérifications pour synchronisation rapide des autres appareils
+        setTimeout(checkAndApplyUpdates, 10000);  // Check à 10s
+        setTimeout(checkAndApplyUpdates, 20000);  // Check à 20s
       }
     } else {
       showNotification(result.error || 'Erreur lors de l\'upload de l\'image', 'error', 5000);
@@ -573,6 +593,9 @@ document.addEventListener('DOMContentLoaded', async ()=>{
                 localStorage.setItem('bandeau_last_modified', lastKnownModified);
               }
             }, 500);
+            // Burst de vérifications pour synchronisation rapide des autres appareils
+            setTimeout(checkAndApplyUpdates, 10000);  // Check à 10s
+            setTimeout(checkAndApplyUpdates, 20000);  // Check à 20s
           } else if (!result.localOnly) {
             showNotification('Erreur lors de la sauvegarde de la vitesse', 'error', 4000);
           }
@@ -604,6 +627,9 @@ document.addEventListener('DOMContentLoaded', async ()=>{
                 localStorage.setItem('bandeau_last_modified', lastKnownModified);
               }
             }, 500);
+            // Burst de vérifications pour synchronisation rapide des autres appareils
+            setTimeout(checkAndApplyUpdates, 10000);  // Check à 10s
+            setTimeout(checkAndApplyUpdates, 20000);  // Check à 20s
           } else if (!result.localOnly) {
             showNotification('Erreur lors de la sauvegarde de la couleur', 'error', 4000);
           }
@@ -636,6 +662,9 @@ document.addEventListener('DOMContentLoaded', async ()=>{
                 localStorage.setItem('bandeau_last_modified', lastKnownModified);
               }
             }, 500);
+            // Burst de vérifications pour synchronisation rapide des autres appareils
+            setTimeout(checkAndApplyUpdates, 10000);  // Check à 10s
+            setTimeout(checkAndApplyUpdates, 20000);  // Check à 20s
           } else {
             if (result.localOnly) {
               showNotification(result.message, 'warning', 6000);
@@ -735,35 +764,49 @@ document.addEventListener('DOMContentLoaded', async ()=>{
 
   // Fonction pour vérifier et appliquer les mises à jour
   async function checkAndApplyUpdates() {
+    console.log('🔄 [SYNC] Vérification des mises à jour...', new Date().toLocaleTimeString());
     updateSyncIndicator('syncing');
     
     try {
       const updateCheck = await checkForUpdates();
+      console.log('📡 [SYNC] Réponse API:', updateCheck);
       
       if (updateCheck.error) {
+        console.warn('⚠️ [SYNC] Erreur API:', updateCheck.error);
         updateSyncIndicator('error');
         return;
       }
       
       // Comparer les timestamps
+      console.log('🕐 [SYNC] Comparaison timestamps:', {
+        distant: updateCheck.lastModified,
+        local: lastKnownModified,
+        different: updateCheck.lastModified !== lastKnownModified
+      });
+      
       if (updateCheck.lastModified && updateCheck.lastModified !== lastKnownModified) {
+        console.log('✅ [SYNC] Mise à jour détectée ! Rechargement des données...');
         // Il y a une mise à jour, charger les données complètes
         const freshData = await loadBandeauData();
         await applyBandeauData(freshData);
+        console.log('🎉 [SYNC] Données mises à jour avec succès !');
         updateSyncIndicator('synced');
       } else {
+        console.log('✓ [SYNC] Aucune mise à jour nécessaire');
         updateSyncIndicator('synced');
       }
     } catch (error) {
-      console.error('Erreur lors de la vérification des mises à jour:', error);
+      console.error('❌ [SYNC] Erreur lors de la vérification des mises à jour:', error);
       updateSyncIndicator('error');
     }
   }
 
-  // Démarrer le polling toutes les 15 secondes
-  pollingInterval = setInterval(checkAndApplyUpdates, 15000);
+  // Démarrer le polling toutes les 120 secondes (2 minutes)
+  console.log('🚀 [INIT] Démarrage du polling automatique (intervalle: 120s)');
+  pollingInterval = setInterval(checkAndApplyUpdates, 120000);
   
   // Vérifier immédiatement au chargement (après un court délai pour éviter les conflits)
+  console.log('⏱️ [INIT] Première vérification programmée dans 2 secondes...');
   setTimeout(checkAndApplyUpdates, 2000);
 });
 
